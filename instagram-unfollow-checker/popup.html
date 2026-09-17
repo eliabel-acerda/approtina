@@ -40,7 +40,12 @@
     display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px;
   }
   li:hover{background:var(--panel);}
-  li img{width:32px; height:32px; border-radius:50%; background:#ddd; object-fit:cover; flex:none;}
+  li img{width:32px; height:32px; border-radius:50%; object-fit:cover; display:block;}
+  .avatar{
+    width:32px; height:32px; border-radius:50%; flex:none; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:13px;
+  }
   .u-info{flex:1; min-width:0;}
   .u-info .uname{
     display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;

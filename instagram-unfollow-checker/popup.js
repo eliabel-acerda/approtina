@@ -17,6 +17,13 @@ function friendlyError(err) {
   return ERROR_MESSAGES[err] || `Erro: ${err}`;
 }
 
+function colorFromUsername(username) {
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) hash = (hash * 31 + username.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return `hsl(${hue}, 55%, 45%)`;
+}
+
 function render() {
   if (!currentResult) {
     whoLine.textContent = "Nenhum dado sincronizado ainda.";
@@ -42,21 +49,21 @@ function render() {
   for (const u of filtered) {
     const li = document.createElement("li");
 
-    const img = document.createElement("img");
-    img.alt = "";
-    img.referrerPolicy = "no-referrer";
-    img.src = u.avatar || "";
-    img.addEventListener("error", () => {
-      if (img.dataset.retried) {
-        img.style.visibility = "hidden";
-        return;
-      }
-      // O CDN do Instagram às vezes rejeita a requisição sem referrer;
-      // tenta de novo deixando o navegador enviar o referrer padrão.
-      img.dataset.retried = "1";
-      img.referrerPolicy = "strict-origin-when-cross-origin";
-      img.src = u.avatar || "";
-    });
+    const avatarWrap = document.createElement("div");
+    avatarWrap.className = "avatar";
+    avatarWrap.style.background = colorFromUsername(u.username);
+    avatarWrap.textContent = (u.username[0] || "?").toUpperCase();
+
+    if (u.avatar) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.referrerPolicy = "no-referrer";
+      img.addEventListener("load", () => avatarWrap.replaceChildren(img), { once: true });
+      // O CDN do Instagram costuma bloquear a foto quando pedida fora do
+      // contexto da própria página; se falhar, fica o avatar de iniciais.
+      img.addEventListener("error", () => {}, { once: true });
+      img.src = u.avatar;
+    }
 
     const info = document.createElement("div");
     info.className = "u-info";
@@ -77,7 +84,7 @@ function render() {
     btn.textContent = "Deixar de seguir";
     btn.addEventListener("click", () => handleUnfollowClick(u, btn, li));
 
-    li.appendChild(img);
+    li.appendChild(avatarWrap);
     li.appendChild(info);
     li.appendChild(btn);
     listEl.appendChild(li);
