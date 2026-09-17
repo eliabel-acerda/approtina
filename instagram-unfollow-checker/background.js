@@ -24,14 +24,30 @@ async function fetchJSON(url, options = {}) {
   const res = await fetch(url, { credentials: "include", ...options, headers: igHeaders(options.headers) });
   if (res.status === 401) throw new Error("NOT_LOGGED_IN");
   if (res.status === 429) throw new Error("RATE_LIMITED");
-  if (!res.ok) throw new Error(`HTTP_${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP_${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`);
+  }
   return res.json();
 }
 
+// O Instagram guarda o id numérico da conta logada no cookie "ds_user_id"
+// assim que você faz login no site. Usamos isso em vez de chamar o endpoint
+// interno de "current_user" (que o Instagram muda com frequência e às vezes
+// responde 400 fora do contexto exato da própria página).
 async function getCurrentUser() {
-  const data = await fetchJSON(`${BASE}/api/v1/accounts/current_user/?edit=true`);
-  if (!data || !data.user) throw new Error("NOT_LOGGED_IN");
-  return { id: data.user.pk || data.user.pk_id, username: data.user.username };
+  const userId = await getCookie("ds_user_id");
+  if (!userId) throw new Error("NOT_LOGGED_IN");
+
+  let username = null;
+  try {
+    const data = await fetchJSON(`${BASE}/api/v1/accounts/current_user/?edit=true`);
+    username = data?.user?.username || null;
+  } catch (_) {
+    // best-effort: sem o nome de usuário a extensão ainda funciona,
+    // só não mostra o "@usuario" no cabeçalho.
+  }
+  return { id: userId, username };
 }
 
 async function fetchAllEdges(kind, userId, onProgress) {

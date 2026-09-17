@@ -26,7 +26,7 @@ function render() {
   }
 
   const { me, updatedAt, followingCount, followersCount, notFollowingBack } = currentResult;
-  whoLine.textContent = `@${me} · atualizado ${new Date(updatedAt).toLocaleString("pt-BR")}`;
+  whoLine.textContent = `${me ? "@" + me : "Sua conta"} · atualizado ${new Date(updatedAt).toLocaleString("pt-BR")}`;
   summaryLine.textContent = `Você segue ${followingCount} · é seguido por ${followersCount} · ${notFollowingBack.length} não seguem de volta`;
 
   const filtered = notFollowingBack.filter((u) =>
@@ -135,7 +135,7 @@ syncBtn.addEventListener("click", async () => {
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === "SYNC_PROGRESS") {
     const p = msg.progress;
-    if (p.stage === "me") statusLine.textContent = `Conectado como @${p.username}. Carregando listas...`;
+    if (p.stage === "me") statusLine.textContent = p.username ? `Conectado como @${p.username}. Carregando listas...` : "Conectado à sua conta. Carregando listas...";
     if (p.stage === "following") statusLine.textContent = `Carregando quem você segue... (${p.count})`;
     if (p.stage === "followers") statusLine.textContent = `Carregando seus seguidores... (${p.count})`;
   }
