@@ -42,7 +42,11 @@
   li:hover{background:var(--panel);}
   li img{width:32px; height:32px; border-radius:50%; background:#ddd; object-fit:cover; flex:none;}
   .u-info{flex:1; min-width:0;}
-  .u-info .uname{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .u-info .uname{
+    display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    color:var(--ink); text-decoration:none;
+  }
+  .u-info .uname:hover{color:var(--accent); text-decoration:underline;}
   .u-info .fname{color:var(--ink-soft); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .unfollow-btn{
     flex:none; background:#fff; color:var(--danger); border:1px solid var(--danger);

@@ -43,15 +43,28 @@ function render() {
     const li = document.createElement("li");
 
     const img = document.createElement("img");
-    img.src = u.avatar || "";
     img.alt = "";
     img.referrerPolicy = "no-referrer";
-    img.addEventListener("error", () => { img.style.visibility = "hidden"; }, { once: true });
+    img.src = u.avatar || "";
+    img.addEventListener("error", () => {
+      if (img.dataset.retried) {
+        img.style.visibility = "hidden";
+        return;
+      }
+      // O CDN do Instagram às vezes rejeita a requisição sem referrer;
+      // tenta de novo deixando o navegador enviar o referrer padrão.
+      img.dataset.retried = "1";
+      img.referrerPolicy = "strict-origin-when-cross-origin";
+      img.src = u.avatar || "";
+    });
 
     const info = document.createElement("div");
     info.className = "u-info";
-    const uname = document.createElement("div");
+    const uname = document.createElement("a");
     uname.className = "uname";
+    uname.href = `https://www.instagram.com/${encodeURIComponent(u.username)}/`;
+    uname.target = "_blank";
+    uname.rel = "noopener noreferrer";
     uname.textContent = "@" + u.username;
     const fname = document.createElement("div");
     fname.className = "fname";
