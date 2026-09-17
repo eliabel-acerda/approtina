@@ -1,7 +1,8 @@
 // Service worker: busca (somente leitura) seguidores/seguindo usando a sessão
 // já autenticada do próprio usuário no instagram.com, e executa unfollow
-// individual apenas quando explicitamente solicitado pelo popup (um clique
-// do usuário = uma ação, sem laços automáticos nem atrasos artificiais).
+// individual apenas quando explicitamente solicitado pelo painel injetado na
+// página (um clique do usuário = uma ação, sem laços automáticos nem atrasos
+// artificiais).
 
 const IG_APP_ID = "936619743392459"; // id público da web app do Instagram, usado pelo próprio site
 const BASE = "https://www.instagram.com";
@@ -118,10 +119,22 @@ async function unfollowUser(userId) {
   return true;
 }
 
+// O ícone da extensão não abre popup: ele liga/desliga o painel que o
+// content script já injetou na própria página do instagram.com. Fora do
+// instagram.com, abre o site numa aba nova em vez de tentar injetar.
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.url && tab.url.startsWith(BASE)) {
+    chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PANEL" }).catch(() => {});
+  } else {
+    chrome.tabs.create({ url: `${BASE}/` });
+  }
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "SYNC") {
+    const tabId = sender.tab && sender.tab.id;
     syncNotFollowingBack((progress) => {
-      chrome.runtime.sendMessage({ type: "SYNC_PROGRESS", progress }).catch(() => {});
+      if (tabId != null) chrome.tabs.sendMessage(tabId, { type: "SYNC_PROGRESS", progress }).catch(() => {});
     })
       .then((result) => sendResponse({ ok: true, result }))
       .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));

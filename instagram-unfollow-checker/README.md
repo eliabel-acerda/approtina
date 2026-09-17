@@ -13,6 +13,12 @@ de seguir manualmente, um perfil por vez.
   por dois cliques seus (o segundo confirma). Não há laço automático,
   fila em massa nem atraso programado para simular comportamento humano.
 - **Sem automação de escrita**: a extensão nunca dispara unfollow sozinha.
+- **Painel injetado na própria página**: ao clicar no ícone da extensão
+  enquanto estiver em instagram.com, um painel aparece sobre a página (não é
+  um popup separado). É isso que permite carregar as fotos de perfil de
+  verdade — o CDN do Instagram bloqueia esse tipo de imagem quando o pedido
+  vem de fora do próprio site (ex.: de um popup de extensão), mas aceita
+  quando a imagem é carregada a partir do documento real do instagram.com.
 
 Isso existe porque o Instagram proíbe em seus Termos de Uso qualquer
 automação de ações (seguir/deixar de seguir) via bots, scripts ou extensões
@@ -30,7 +36,9 @@ clique explícito seu.
    `instagram-unfollow-checker/`.
 4. Faça login normalmente em [instagram.com](https://www.instagram.com) em
    alguma aba do navegador.
-5. Clique no ícone da extensão e depois em "Sincronizar dados".
+5. Nessa mesma aba, clique no ícone da extensão para abrir o painel (ele
+   aparece no canto superior direito da página) e depois em "Sincronizar
+   dados". Clicar no ícone de novo, ou no "×" do painel, fecha o painel.
 
 ## Limitações conhecidas
 
