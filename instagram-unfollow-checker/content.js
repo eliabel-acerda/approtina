@@ -79,9 +79,11 @@
       </header>
       <div class="warn">
         Esta extensão só lê os dados de seguidores/seguindo da sua própria conta.
-        O botão "Deixar de seguir" executa uma única ação por clique — não há
-        automação em massa nem temporização artificial. Evite clicar em muitos
-        perfis em pouco tempo para não acionar limites de segurança do Instagram.
+        Cada "Deixar de seguir" é uma ação sua, um clique por vez — não existe
+        fila nem loop automático. Como sua conta já recebeu uma limitação do
+        Instagram, a extensão agora impõe uma pausa mínima entre sincronizações
+        e entre unfollows, e se travar sozinha por um tempo ao detectar
+        qualquer sinal de limite vindo do Instagram.
       </div>
       <div class="actions"><button id="syncBtn">Sincronizar dados</button></div>
       <div class="status" id="statusLine"></div>
@@ -105,9 +107,20 @@
 
   const ERROR_MESSAGES = {
     NOT_LOGGED_IN: "Você precisa estar logado no instagram.com.",
-    RATE_LIMITED: "O Instagram limitou as requisições temporariamente. Aguarde alguns minutos e tente novamente.",
+    RATE_LIMITED: "O Instagram limitou as requisições temporariamente. A extensão vai ficar pausada por um tempo antes de tentar de novo.",
+    ACCOUNT_LIMITED: "O Instagram sinalizou uma limitação de ação nesta conta. Pare de usar a extensão até ela ser removida — normalmente exige um tempo sem nenhuma automação.",
   };
   function friendlyError(err) {
+    if (err.startsWith("BLOCKED:")) {
+      const [, mins, reason] = err.split(":");
+      return `Pausado por segurança (${reason}). Tente de novo em ~${mins} min.`;
+    }
+    if (err.startsWith("COOLDOWN_SYNC:")) {
+      return `Para não sobrecarregar sua conta, espere ~${err.split(":")[1]} min antes de sincronizar de novo.`;
+    }
+    if (err.startsWith("COOLDOWN_UNFOLLOW:")) {
+      return `Espere ${err.split(":")[1]}s antes do próximo unfollow.`;
+    }
     return ERROR_MESSAGES[err] || `Erro: ${err}`;
   }
 
@@ -181,6 +194,36 @@
     }
   }
 
+  // Depois de um unfollow real, desabilita os botões visíveis pelo mesmo
+  // intervalo que o background já está aplicando, pra não incentivar uma
+  // sequência de cliques rápidos que pareça automação.
+  function startUnfollowCooldown(seconds) {
+    const buttons = () => Array.from(listEl.querySelectorAll(".unfollow-btn"));
+    let remaining = seconds;
+    const originalLabels = new Map(buttons().map((b) => [b, b.textContent]));
+    const tick = () => {
+      for (const b of buttons()) {
+        if (b.disabled && !b.dataset.cooldown) continue;
+        b.dataset.cooldown = "1";
+        b.disabled = true;
+        b.textContent = `Aguarde ${remaining}s`;
+      }
+      remaining -= 1;
+      if (remaining < 0) {
+        clearInterval(timer);
+        for (const b of buttons()) {
+          if (b.dataset.cooldown) {
+            delete b.dataset.cooldown;
+            b.disabled = false;
+            b.textContent = originalLabels.get(b) || "Deixar de seguir";
+          }
+        }
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+  }
+
   function handleUnfollowClick(user, btn, li) {
     if (btn.dataset.armed !== "1") {
       btn.dataset.armed = "1";
@@ -207,6 +250,7 @@
       currentResult.notFollowingBack = currentResult.notFollowingBack.filter((u) => String(u.id) !== String(user.id));
       li.remove();
       summaryLine.textContent = `Você segue ${currentResult.followingCount} · é seguido por ${currentResult.followersCount} · ${currentResult.notFollowingBack.length} não seguem de volta`;
+      if (res.cooldownSeconds) startUnfollowCooldown(res.cooldownSeconds);
     } catch (err) {
       statusLine.textContent = friendlyError(err.message || String(err));
       btn.disabled = false;

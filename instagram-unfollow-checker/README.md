@@ -10,9 +10,15 @@ de seguir manualmente, um perfil por vez.
   sessão que você já tem aberta em instagram.com (nenhuma senha é
   solicitada ou armazenada pela extensão).
 - **Unfollow manual**: cada "Deixar de seguir" é uma ação isolada, disparada
-  por dois cliques seus (o segundo confirma). Não há laço automático,
-  fila em massa nem atraso programado para simular comportamento humano.
+  por dois cliques seus (o segundo confirma). Não há laço automático nem
+  fila em massa.
 - **Sem automação de escrita**: a extensão nunca dispara unfollow sozinha.
+- **Limites de segurança**: sincronizações completas exigem um intervalo
+  mínimo de ~20 min entre si, unfollows exigem ~20-35s de intervalo entre um
+  e outro, e a extensão trava sozinha por 30 min (após um erro 429) ou 24h
+  (ao detectar qualquer sinal de limitação de ação vindo do Instagram na
+  resposta) sem tentar de novo. Esses limites vivem no background da
+  extensão, não na tela, então valem mesmo fechando e reabrindo o painel.
 - **Painel injetado na própria página**: ao clicar no ícone da extensão
   enquanto estiver em instagram.com, um painel aparece sobre a página (não é
   um popup separado). É isso que permite carregar as fotos de perfil de

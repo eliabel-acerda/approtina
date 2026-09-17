@@ -1,12 +1,53 @@
 // Service worker: busca (somente leitura) seguidores/seguindo usando a sessão
 // já autenticada do próprio usuário no instagram.com, e executa unfollow
 // individual apenas quando explicitamente solicitado pelo painel injetado na
-// página (um clique do usuário = uma ação, sem laços automáticos nem atrasos
-// artificiais).
+// página (um clique do usuário = uma ação). Os limites de segurança abaixo
+// (intervalo mínimo entre sincronizações, intervalo mínimo entre unfollows,
+// e pausa longa automática ao primeiro sinal de limitação do Instagram)
+// existem porque esta conta já recebeu uma limitação — o objetivo é reduzir
+// o padrão de tráfego que se parece com automação, não é uma garantia.
 
 const IG_APP_ID = "936619743392459"; // id público da web app do Instagram, usado pelo próprio site
 const BASE = "https://www.instagram.com";
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25; // parecido com o tamanho de página que o próprio site pede ao rolar a lista
+
+// --- Limites de segurança -------------------------------------------------
+// O Instagram já aplicou uma limitação nesta conta, então estes controles
+// vivem aqui no background (não na UI) para valerem mesmo que o painel seja
+// fechado e reaberto: uma sincronização não pode começar antes de um
+// intervalo mínimo, um unfollow não pode ser disparado logo depois do
+// anterior, e qualquer sinal de limitação vindo do Instagram (429, ou um
+// corpo de resposta com checkpoint/feedback/challenge_required) trava a
+// extensão inteira por um bom tempo, sem tentar de novo sozinha.
+const SAFETY_KEY = "igSafetyState";
+const MIN_SYNC_INTERVAL_MS = 20 * 60 * 1000; // 20 min entre sincronizações completas
+const UNFOLLOW_INTERVAL_BASE_MS = 20 * 1000; // 20-35s entre unfollows manuais, com variação
+const UNFOLLOW_INTERVAL_JITTER_MS = 15 * 1000;
+const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000; // 30 min após um 429
+const ACCOUNT_LIMITED_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h após sinal de limitação da conta
+
+async function getSafetyState() {
+  const { [SAFETY_KEY]: state } = await chrome.storage.local.get(SAFETY_KEY);
+  return state || {};
+}
+
+async function patchSafetyState(patch) {
+  const state = await getSafetyState();
+  const next = { ...state, ...patch };
+  await chrome.storage.local.set({ [SAFETY_KEY]: next });
+  return next;
+}
+
+function minutesLeft(untilTs) {
+  return Math.max(1, Math.ceil((untilTs - Date.now()) / 60000));
+}
+
+async function assertNotBlocked() {
+  const state = await getSafetyState();
+  if (state.blockedUntil && state.blockedUntil > Date.now()) {
+    throw new Error(`BLOCKED:${minutesLeft(state.blockedUntil)}:${state.blockedReason || "seguranca"}`);
+  }
+}
 
 async function getCookie(name) {
   const cookie = await chrome.cookies.get({ url: BASE, name });
@@ -24,9 +65,16 @@ function igHeaders(extra = {}) {
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, { credentials: "include", ...options, headers: igHeaders(options.headers) });
   if (res.status === 401) throw new Error("NOT_LOGGED_IN");
-  if (res.status === 429) throw new Error("RATE_LIMITED");
+  if (res.status === 429) {
+    await patchSafetyState({ blockedUntil: Date.now() + RATE_LIMIT_COOLDOWN_MS, blockedReason: "limite de requisições do Instagram" });
+    throw new Error("RATE_LIMITED");
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    if (/checkpoint_required|feedback_required|challenge_required/i.test(body)) {
+      await patchSafetyState({ blockedUntil: Date.now() + ACCOUNT_LIMITED_COOLDOWN_MS, blockedReason: "limitação de ação na conta" });
+      throw new Error("ACCOUNT_LIMITED");
+    }
     throw new Error(`HTTP_${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`);
   }
   return res.json();
@@ -67,15 +115,22 @@ async function fetchAllEdges(kind, userId, onProgress) {
     onProgress && onProgress(kind, list.length);
     if (!page.next_max_id || users.length === 0) break;
     maxId = page.next_max_id;
-    // pequena pausa só para não disparar dezenas de requisições de leitura
-    // em sequência instantânea; isto pagina a MESMA consulta que o próprio
-    // site faz ao rolar a lista de seguidores/seguindo, não automatiza ações de escrita.
-    await new Promise((r) => setTimeout(r, 300));
+    // Pausa variável (2.5-4.5s) entre páginas de leitura, parecida com o
+    // ritmo de alguém rolando a lista manualmente, em vez de um intervalo
+    // fixo curto que é mais fácil de reconhecer como automação.
+    await new Promise((r) => setTimeout(r, 2500 + Math.random() * 2000));
   }
   return list;
 }
 
 async function syncNotFollowingBack(sendProgress) {
+  await assertNotBlocked();
+  const state = await getSafetyState();
+  if (state.nextSyncAllowedAt && Date.now() < state.nextSyncAllowedAt) {
+    throw new Error(`COOLDOWN_SYNC:${minutesLeft(state.nextSyncAllowedAt)}`);
+  }
+  await patchSafetyState({ nextSyncAllowedAt: Date.now() + MIN_SYNC_INTERVAL_MS });
+
   const me = await getCurrentUser();
   sendProgress({ stage: "me", username: me.username });
 
@@ -99,8 +154,18 @@ async function syncNotFollowingBack(sendProgress) {
 }
 
 async function unfollowUser(userId) {
+  await assertNotBlocked();
+  const state = await getSafetyState();
+  const now = Date.now();
+  if (state.nextUnfollowAllowedAt && now < state.nextUnfollowAllowedAt) {
+    throw new Error(`COOLDOWN_UNFOLLOW:${Math.ceil((state.nextUnfollowAllowedAt - now) / 1000)}`);
+  }
   const csrftoken = await getCookie("csrftoken");
   if (!csrftoken) throw new Error("NOT_LOGGED_IN");
+
+  const cooldownMs = UNFOLLOW_INTERVAL_BASE_MS + Math.random() * UNFOLLOW_INTERVAL_JITTER_MS;
+  await patchSafetyState({ nextUnfollowAllowedAt: now + cooldownMs });
+
   const res = await fetch(`${BASE}/api/v1/web/friendships/${userId}/unfollow/`, {
     method: "POST",
     credentials: "include",
@@ -112,11 +177,21 @@ async function unfollowUser(userId) {
     body: "",
   });
   if (res.status === 401) throw new Error("NOT_LOGGED_IN");
-  if (res.status === 429) throw new Error("RATE_LIMITED");
-  if (!res.ok) throw new Error(`HTTP_${res.status}`);
+  if (res.status === 429) {
+    await patchSafetyState({ blockedUntil: Date.now() + RATE_LIMIT_COOLDOWN_MS, blockedReason: "limite de requisições do Instagram" });
+    throw new Error("RATE_LIMITED");
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (/checkpoint_required|feedback_required|challenge_required/i.test(body)) {
+      await patchSafetyState({ blockedUntil: Date.now() + ACCOUNT_LIMITED_COOLDOWN_MS, blockedReason: "limitação de ação na conta" });
+      throw new Error("ACCOUNT_LIMITED");
+    }
+    throw new Error(`HTTP_${res.status}`);
+  }
   const data = await res.json().catch(() => ({}));
   if (data.status && data.status !== "ok") throw new Error("UNFOLLOW_FAILED");
-  return true;
+  return { cooldownSeconds: Math.ceil(cooldownMs / 1000) };
 }
 
 // O ícone da extensão não abre popup: ele liga/desliga o painel que o
@@ -143,7 +218,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg?.type === "UNFOLLOW") {
     unfollowUser(msg.userId)
-      .then(async () => {
+      .then(async ({ cooldownSeconds }) => {
         const { igUnfollowCheckerResult } = await chrome.storage.local.get("igUnfollowCheckerResult");
         if (igUnfollowCheckerResult) {
           igUnfollowCheckerResult.notFollowingBack = igUnfollowCheckerResult.notFollowingBack.filter(
@@ -151,7 +226,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           );
           await chrome.storage.local.set({ igUnfollowCheckerResult });
         }
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, cooldownSeconds });
       })
       .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
     return true;
