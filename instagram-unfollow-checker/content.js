@@ -121,6 +121,9 @@
     if (err.startsWith("COOLDOWN_UNFOLLOW:")) {
       return `Espere ${err.split(":")[1]}s antes do próximo unfollow.`;
     }
+    if (/extension context invalidated/i.test(err)) {
+      return "A extensão foi atualizada/recarregada. Atualize esta página (F5) e tente de novo.";
+    }
     return ERROR_MESSAGES[err] || `Erro: ${err}`;
   }
 
