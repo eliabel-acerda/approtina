@@ -20,14 +20,18 @@ popup separado), com limites de segurança embutidos desde o início.
   sinal de limitação/bloqueio na resposta do X. Nenhum desses tenta de novo
   sozinho.
 
-  Mesmo assim, um 429 ocasional é esperado: o X limita essas listas com
-  bastante rigor quando acessadas fora do próprio site, especialmente em
-  contas com muitos seguidores/seguindo. Se aparecer "O X limitou as
-  requisições...", não é um bug — é o limite de segurança fazendo o que
-  deveria: parar por 30 min em vez de insistir. Espere o tempo indicado e
-  tente de novo; se voltar a acontecer toda vez mesmo com esse intervalo,
-  o site pode estar tratando esse token/sessão como tráfego automatizado de
-  forma mais agressiva no momento.
+  Mesmo assim, um 429 ocasional é esperado: o X limita essas listas legadas
+  por **quantidade de requisições numa janela de tempo**, não por
+  velocidade — então numa conta com muitas contas seguidas/seguidoras, uma
+  sincronização inteira pode não caber de uma vez só, não importa o quão
+  devagar cada página seja pedida. Se aparecer "O X limitou as
+  requisições...", não é um bug — é o limite de segurança parando por 30
+  min em vez de insistir. **A sincronização retoma de onde parou**: o
+  progresso de cada lista (seguindo / seguidores) fica salvo depois de cada
+  página lida com sucesso, então clicar em "Sincronizar dados" de novo
+  depois da pausa continua a busca em vez de recomeçar do zero. Em contas
+  grandes, pode ser preciso repetir esse ciclo (esperar → sincronizar) mais
+  de uma vez até completar as duas listas inteiras.
 
 ## ⚠️ Risco técnico maior que a versão do Instagram
 

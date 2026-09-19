@@ -112,11 +112,39 @@ function mapUser(u) {
   return { id: u.id_str || String(u.id), username: u.screen_name, fullName: u.name || "", avatar };
 }
 
+// O limite do X nessas listas legadas parece ser por quantidade de
+// requisições numa janela de tempo, não por velocidade — então numa conta
+// com muitas contas seguidas/seguidoras, uma sincronização inteira pode
+// não caber antes de um 429, não importa o quão devagar a gente vá. Em vez
+// de perder tudo e recomeçar do zero a cada tentativa, o progresso de cada
+// lista (cursor + contas já lidas) fica salvo e é retomado na próxima vez
+// que "Sincronizar dados" for clicado, depois da pausa de segurança.
+const PARTIAL_KEY = "xSyncPartial";
+
+async function getPartialProgress() {
+  const { [PARTIAL_KEY]: partial } = await chrome.storage.local.get(PARTIAL_KEY);
+  return partial || {};
+}
+
+async function savePartialProgress(kind, cursor, list) {
+  const partial = await getPartialProgress();
+  partial[kind] = { cursor, list };
+  await chrome.storage.local.set({ [PARTIAL_KEY]: partial });
+}
+
+async function clearPartialProgress(kind) {
+  const partial = await getPartialProgress();
+  delete partial[kind];
+  await chrome.storage.local.set({ [PARTIAL_KEY]: partial });
+}
+
 async function fetchAllEdges(kind, onProgress) {
   // kind: "following" -> friends/list.json, "followers" -> followers/list.json
   const path = kind === "following" ? "friends" : "followers";
-  let cursor = "-1";
-  const list = [];
+  const partial = await getPartialProgress();
+  let cursor = (partial[kind] && partial[kind].cursor) || "-1";
+  const list = partial[kind] && partial[kind].list ? [...partial[kind].list] : [];
+  if (list.length) onProgress && onProgress(kind, list.length);
   for (;;) {
     const url = new URL(`${BASE}/i/api/1.1/${path}/list.json`);
     url.searchParams.set("count", String(PAGE_SIZE));
@@ -128,12 +156,16 @@ async function fetchAllEdges(kind, onProgress) {
     for (const u of users) list.push(mapUser(u));
     onProgress && onProgress(kind, list.length);
     const next = page.next_cursor_str;
-    if (!next || next === "0" || next === cursor || users.length === 0) break;
+    if (!next || next === "0" || next === cursor || users.length === 0) {
+      await clearPartialProgress(kind);
+      break;
+    }
     cursor = next;
+    // Salva antes da próxima requisição: se ela cair em 429, essa lista até
+    // aqui não se perde.
+    await savePartialProgress(kind, cursor, list);
     // Pausa variável (4-7s) entre páginas, parecida com o ritmo de alguém
-    // rolando a lista manualmente. O X limita essas listas com bastante
-    // rigor quando acessadas fora do próprio site, então mais devagar aqui
-    // reduz a chance de um 429 no meio da sincronização.
+    // rolando a lista manualmente.
     await new Promise((r) => setTimeout(r, 4000 + Math.random() * 3000));
   }
   return list;
