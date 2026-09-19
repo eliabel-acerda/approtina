@@ -11,12 +11,12 @@
 
   shadow.innerHTML = `
     <style>
-      :host{ all: initial; }
-      *{ box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-      :root{
+      :host{
+        all: initial;
         --bg:#faf9f7; --panel:#fff; --ink:#22201c; --ink-soft:#6b6357;
         --line:#e6e2da; --accent:#1d1d1f; --danger:#b3543f; --warn:#8a5a1f; --warn-bg:#fbf1de;
       }
+      *{ box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
       .panel{
         position:fixed; top:16px; right:16px; width:380px; max-height:calc(100vh - 32px);
         background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:14px;
