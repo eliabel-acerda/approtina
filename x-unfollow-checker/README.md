@@ -14,10 +14,20 @@ popup separado), com limites de segurança embutidos desde o início.
   por dois cliques seus (o segundo confirma). Não há laço automático nem
   fila em massa.
 - **Limites de segurança** (no background, valem mesmo fechando o painel):
-  intervalo mínimo de ~20 min entre sincronizações completas; ~20-35s entre
-  unfollows; pausa automática de 30 min após um erro 429, ou 24h ao detectar
-  qualquer sinal de limitação/bloqueio na resposta do X. Nenhum desses
-  tenta de novo sozinho.
+  intervalo mínimo de ~20 min entre sincronizações completas; páginas de 20
+  contas por vez com pausa de 4-7s entre cada uma; ~20-35s entre unfollows;
+  pausa automática de 30 min após um erro 429, ou 24h ao detectar qualquer
+  sinal de limitação/bloqueio na resposta do X. Nenhum desses tenta de novo
+  sozinho.
+
+  Mesmo assim, um 429 ocasional é esperado: o X limita essas listas com
+  bastante rigor quando acessadas fora do próprio site, especialmente em
+  contas com muitos seguidores/seguindo. Se aparecer "O X limitou as
+  requisições...", não é um bug — é o limite de segurança fazendo o que
+  deveria: parar por 30 min em vez de insistir. Espere o tempo indicado e
+  tente de novo; se voltar a acontecer toda vez mesmo com esse intervalo,
+  o site pode estar tratando esse token/sessão como tráfego automatizado de
+  forma mais agressiva no momento.
 
 ## ⚠️ Risco técnico maior que a versão do Instagram
 

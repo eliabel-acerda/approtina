@@ -8,7 +8,9 @@
 
 const BASE = "https://x.com";
 const ALT_BASE = "https://twitter.com"; // cookies de sessões mais antigas podem viver aqui
-const PAGE_SIZE = 40;
+// 20 é o mesmo tamanho de página que o próprio cliente web do X pede nessas
+// listas — um valor maior chama mais atenção do limitador de requisições.
+const PAGE_SIZE = 20;
 
 // Bearer token público usado pelo próprio cliente web do X (não é secreto:
 // vem embutido no bundle JS do site e é o mesmo para qualquer sessão). Se o
@@ -128,9 +130,11 @@ async function fetchAllEdges(kind, onProgress) {
     const next = page.next_cursor_str;
     if (!next || next === "0" || next === cursor || users.length === 0) break;
     cursor = next;
-    // Pausa variável (2.5-4.5s) entre páginas, parecida com o ritmo de
-    // alguém rolando a lista manualmente.
-    await new Promise((r) => setTimeout(r, 2500 + Math.random() * 2000));
+    // Pausa variável (4-7s) entre páginas, parecida com o ritmo de alguém
+    // rolando a lista manualmente. O X limita essas listas com bastante
+    // rigor quando acessadas fora do próprio site, então mais devagar aqui
+    // reduz a chance de um 429 no meio da sincronização.
+    await new Promise((r) => setTimeout(r, 4000 + Math.random() * 3000));
   }
   return list;
 }
@@ -147,6 +151,8 @@ async function syncNotFollowingBack(sendProgress) {
   sendProgress({ stage: "me", username: null });
 
   const following = await fetchAllEdges("following", (kind, n) => sendProgress({ stage: "following", count: n }));
+  // Pausa entre trocar de lista, em vez de emendar direto na próxima.
+  await new Promise((r) => setTimeout(r, 4000 + Math.random() * 3000));
   const followers = await fetchAllEdges("followers", (kind, n) => sendProgress({ stage: "followers", count: n }));
 
   const followerIds = new Set(followers.map((u) => u.id));
