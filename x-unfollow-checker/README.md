@@ -37,7 +37,12 @@ atualizado em `background.js`:
    navegador, DevTools → aba Network, clique em qualquer coisa que carregue
    dados (rolar o feed, por exemplo), ache uma requisição para
    `x.com/i/api/...` e copie o header `authorization` (formato
-   `Bearer AAAA...`).
+   `Bearer AAAA...`). Copie o valor exatamente como aparece, incluindo um
+   eventual `%3D` literal no meio — não é pra decodificar. Se aparecer
+   `HTTP_401` em toda sincronização mesmo com cookies válidos (`twid`,
+   `ct0`, `auth_token`), é praticamente sempre este token desatualizado; o
+   corpo da resposta 401 fica logado no console do service worker
+   (`chrome://extensions` → "Inspecionar visualizações: service worker").
 2. Os **endpoints** `friends/list.json` / `followers/list.json` — se
    estiverem retornando 404, o X pode ter desativado essas rotas legadas;
    nesse caso, no mesmo Network tab, ache a requisição feita quando você

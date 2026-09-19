@@ -15,7 +15,7 @@ const PAGE_SIZE = 40;
 // X trocar esse valor, as chamadas abaixo passam a responder 401 — nesse
 // caso é preciso capturar o valor atual no Network tab (ver README).
 const BEARER_TOKEN =
-  "AAAAAAAAAAAAAAAAAAAAAFQODgEAAAAAVHTp76lzh3rFzcHbmHVvQxYYpTw=ckAlMINMjmCwxUcaXbAN4XqJVdgMJhqqe1oRB9HXjEZ2rn3O6";
+  "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
 
 // --- Limites de segurança -------------------------------------------------
 const SAFETY_KEY = "xSafetyState";
@@ -81,7 +81,15 @@ async function xHeaders(extra = {}) {
 async function fetchJSON(url, options = {}) {
   const headers = await xHeaders(options.headers);
   const res = await fetch(url, { credentials: "include", ...options, headers });
-  if (res.status === 401) throw new Error("NOT_LOGGED_IN");
+  if (res.status === 401) {
+    const body = await res.text().catch(() => "");
+    // Um 401 aqui quase sempre é o BEARER_TOKEN inválido/expirado, não a
+    // sessão do usuário (essa já foi validada via cookie antes de chegar
+    // aqui). Loga o corpo pra facilitar diagnóstico futuro no console do
+    // service worker, mas mantém a mensagem amigável genérica pro painel.
+    console.error("[x-unfollow-checker] HTTP 401 em", url, "- corpo:", body.slice(0, 300));
+    throw new Error("NOT_LOGGED_IN");
+  }
   if (res.status === 429) {
     await patchSafetyState({ blockedUntil: Date.now() + RATE_LIMIT_COOLDOWN_MS, blockedReason: "limite de requisições do X" });
     throw new Error("RATE_LIMITED");
