@@ -35,9 +35,9 @@ const ACCOUNT_LIMITED_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h após sinal de l
 const TRIAL_KEY = "igTrialState";
 const FREE_USES = 5;
 const UNLOCK_USES = 5;
-// SHA-256 da senha de desbloqueio (padrão: "QNTSV2026"). Pra trocar, veja o
-// README — basta colar aqui o hash da senha nova.
-const UNLOCK_PASSWORD_SHA256 = "356e47a5a129f68c01d9aed3083dc35cbdea83bf96e59faafbf9009a705c4a5e";
+// SHA-256 da senha de desbloqueio — nunca a senha em si, porque este arquivo
+// vai junto pra quem instala. Pra trocar, veja o README.
+const UNLOCK_PASSWORD_SHA256 = "a0ac1f0560a74831d7e885a4b7576e0d9655844391a2ce2148d63f0dc90c3315";
 
 async function getRemainingUses() {
   const { [TRIAL_KEY]: state } = await chrome.storage.local.get(TRIAL_KEY);

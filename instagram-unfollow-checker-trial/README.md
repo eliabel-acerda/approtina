@@ -14,7 +14,8 @@ de seguir manualmente, um perfil por vez.
 - Quando os usos acabam, o painel troca o botão "Sincronizar dados" por um
   campo de senha. A senha certa libera **mais 5 sincronizações**; ela só é
   aceita quando os usos já acabaram (não dá pra acumular).
-- Senha padrão: `QNTSV2026`. **Troque antes de distribuir.** Para trocar:
+- A senha não aparece em nenhum arquivo da extensão — só o hash dela, em
+  `UNLOCK_PASSWORD_SHA256`. Guarde a senha em outro lugar. Para trocar:
   1. Abra o DevTools de qualquer página (F12 → Console) e rode, trocando
      `SUA_SENHA_NOVA`:
      ```js
