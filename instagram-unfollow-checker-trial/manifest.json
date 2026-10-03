@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Quem não me segue de volta (Instagram) — by @lace.eli",
   "version": "1.0.0",
-  "description": "Mostra quem você segue no Instagram que não te segue de volta, e permite deixar de seguir manualmente, um perfil por vez. Por @lace.eli.",
+  "description": "Veja quem não te segue de volta no Instagram e deixe de seguir manualmente, um perfil por vez. Por @lace.eli.",
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
