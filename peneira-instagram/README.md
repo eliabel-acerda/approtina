@@ -12,7 +12,12 @@ nome, ícone e dados próprios). Pode ficar instalada junto com elas.
 ## Como usar
 
 1. Entre no instagram.com já logado e clique no ícone da Peneira.
-2. **Sincronizar dados** carrega quem não te segue de volta.
+2. **Sincronizar dados** carrega quem não te segue de volta. Ao lado da
+   busca, escolha a ordem: **Seguidos por último**, **Seguidos há mais
+   tempo** ou **Nome (A–Z)**. A ordem por data é a que o próprio Instagram
+   devolve pra lista de quem você segue (ele não informa a data em si), e
+   uma lista sincronizada antes dessa opção existir precisa ser
+   sincronizada de novo. A fila segue a ordem escolhida.
 3. Marque os perfis (ou **Selecionar todos**, que respeita o filtro de
    busca) e clique em **Montar fila**.
 4. A fila mostra um perfil por vez, com foto, @ e link:

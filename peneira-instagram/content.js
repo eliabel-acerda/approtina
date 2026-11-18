@@ -46,8 +46,10 @@
       button:disabled{opacity:.55; cursor:default;}
       #syncBtn{ flex:1; background:var(--accent); color:#fff; border:none; padding:9px 10px; font-size:13px; }
       .status{padding:0 14px 8px; color:var(--ink-soft); font-size:11.5px; min-height:14px;}
-      .search{padding:0 14px 8px;}
-      .search input{ width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:12.5px; }
+      .search{padding:0 14px 8px; display:flex; gap:8px;}
+      .search input{ flex:1; min-width:0; padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:12.5px; }
+      .search select{ flex:none; padding:6px 6px; border:1px solid var(--line); border-radius:8px; font-size:12px; background:#fff; color:var(--ink); }
+      .sort-note{padding:0 14px 8px; font-size:11.5px; color:var(--warn);}
       .summary{padding:0 14px 6px; color:var(--ink-soft); font-size:11.5px;}
       .selbar{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 14px 8px;}
       .selbar label{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); cursor:pointer;}
@@ -141,7 +143,15 @@
       <div id="listView">
         <div class="actions"><button id="syncBtn">Sincronizar dados</button></div>
         <div class="status" id="statusLine"></div>
-        <div class="search"><input id="searchInput" type="text" placeholder="Filtrar por usuário..." aria-label="Filtrar por usuário" /></div>
+        <div class="search">
+          <input id="searchInput" type="text" placeholder="Filtrar por usuário..." aria-label="Filtrar por usuário" />
+          <select id="sortSelect" aria-label="Ordenar lista">
+            <option value="recent">Seguidos por último</option>
+            <option value="oldest">Seguidos há mais tempo</option>
+            <option value="name">Nome (A–Z)</option>
+          </select>
+        </div>
+        <div class="sort-note" id="sortNote" hidden>Sincronize de novo para ordenar pela data em que você seguiu — a lista atual foi carregada antes dessa opção existir.</div>
         <div class="summary" id="summaryLine"></div>
         <div class="selbar" id="selBar" hidden>
           <label><input type="checkbox" id="selAll" /> Selecionar todos</label>
@@ -159,6 +169,8 @@
   const whoLine = $("whoLine");
   const summaryLine = $("summaryLine");
   const searchInput = $("searchInput");
+  const sortSelect = $("sortSelect");
+  const sortNote = $("sortNote");
   const listEl = $("list");
   const listView = $("listView");
   const selBar = $("selBar");
@@ -185,6 +197,7 @@
 
   let currentResult = null;
   let filterText = "";
+  let sortMode = "recent"; // "recent" | "oldest" | "name"
   const selected = new Set();
   let queue = null; // { pending: [user], total, done, skipped }
   let dailyCount = 0;
@@ -252,11 +265,27 @@
     return info;
   }
 
+  // followRank vem da sincronização: 0 = seguido mais recentemente. Listas
+  // sincronizadas antes dessa opção não têm o campo e ficam por nome.
+  function hasFollowOrder() {
+    return !!currentResult && currentResult.notFollowingBack.every((u) => typeof u.followRank === "number");
+  }
+
+  function sortUsers(users) {
+    const list = [...users];
+    if (sortMode === "name" || !hasFollowOrder()) return list.sort((a, b) => a.username.localeCompare(b.username));
+    return list.sort((a, b) => (sortMode === "oldest" ? b.followRank - a.followRank : a.followRank - b.followRank));
+  }
+
   function filteredUsers() {
     if (!currentResult) return [];
-    return currentResult.notFollowingBack.filter((u) =>
+    return sortUsers(currentResult.notFollowingBack).filter((u) =>
       !filterText || u.username.toLowerCase().includes(filterText) || (u.fullName || "").toLowerCase().includes(filterText)
     );
+  }
+
+  async function savePrefs() {
+    await chrome.storage.local.set({ [PREFS_KEY]: { sound: qSound.checked, sort: sortMode } });
   }
 
   function updateSelectionUi() {
@@ -285,10 +314,12 @@
       whoLine.textContent = "Nenhum dado sincronizado ainda.";
       summaryLine.textContent = "";
       selBar.hidden = true;
+      sortNote.hidden = true;
       listEl.innerHTML = "";
       return;
     }
 
+    sortNote.hidden = sortMode === "name" || hasFollowOrder();
     const { me, updatedAt, notFollowingBack } = currentResult;
     whoLine.textContent = `${me ? "@" + me : "Sua conta"} · atualizado ${new Date(updatedAt).toLocaleString("pt-BR")}`;
     updateSummary();
@@ -408,7 +439,8 @@
   }
 
   async function startQueue() {
-    const users = currentResult.notFollowingBack.filter((u) => selected.has(String(u.id)));
+    // A fila segue a mesma ordem escolhida na lista.
+    const users = sortUsers(currentResult.notFollowingBack).filter((u) => selected.has(String(u.id)));
     if (users.length === 0) return;
     queue = { pending: users, total: users.length, done: 0, skipped: 0 };
     selected.clear();
@@ -586,6 +618,8 @@
     if (data.igUnfollowCheckerResult) currentResult = data.igUnfollowCheckerResult;
     if (data[QUEUE_KEY]) queue = data[QUEUE_KEY];
     if (data[PREFS_KEY] && typeof data[PREFS_KEY].sound === "boolean") qSound.checked = data[PREFS_KEY].sound;
+    if (data[PREFS_KEY] && ["recent", "oldest", "name"].includes(data[PREFS_KEY].sort)) sortMode = data[PREFS_KEY].sort;
+    sortSelect.value = sortMode;
     try {
       const res = await chrome.runtime.sendMessage({ type: "GET_DAILY" });
       if (res && res.ok) dailyCount = res.dailyCount;
@@ -621,7 +655,12 @@
   qSkip.addEventListener("click", queueSkip);
   qExit.addEventListener("click", queueExit);
   $("qClose").addEventListener("click", closeQueue);
-  qSound.addEventListener("change", () => chrome.storage.local.set({ [PREFS_KEY]: { sound: qSound.checked } }));
+  qSound.addEventListener("change", savePrefs);
+  sortSelect.addEventListener("change", () => {
+    sortMode = sortSelect.value;
+    savePrefs();
+    render();
+  });
   $("closeBtn").addEventListener("click", () => { panel.hidden = true; });
 
   chrome.runtime.onMessage.addListener((msg) => {

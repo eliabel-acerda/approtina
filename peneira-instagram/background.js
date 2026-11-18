@@ -126,11 +126,22 @@ async function fetchAllEdges(kind, userId, onProgress) {
   for (;;) {
     const url = new URL(`${BASE}/api/v1/friendships/${userId}/${kind}/`);
     url.searchParams.set("count", String(PAGE_SIZE));
+    // Na lista de quem você segue, pede a ordem por data em que você seguiu
+    // (mais recente primeiro). O Instagram só respeita isso na lista do
+    // próprio dono da conta e não devolve a data em si, só a ordem.
+    if (kind === "following") url.searchParams.set("order", "date_followed_latest");
     if (maxId) url.searchParams.set("max_id", maxId);
     const page = await fetchJSON(url.toString());
     const users = page.users || [];
     for (const u of users) {
-      list.push({ id: u.pk || u.id, username: u.username, fullName: u.full_name || "", avatar: u.profile_pic_url || "" });
+      list.push({
+        id: u.pk || u.id,
+        username: u.username,
+        fullName: u.full_name || "",
+        avatar: u.profile_pic_url || "",
+        // 0 = seguido mais recentemente.
+        followRank: list.length,
+      });
     }
     onProgress && onProgress(kind, list.length);
     if (!page.next_max_id || users.length === 0) break;
@@ -158,9 +169,9 @@ async function syncNotFollowingBack(sendProgress) {
   const followers = await fetchAllEdges("followers", me.id, (kind, n) => sendProgress({ stage: "followers", count: n }));
 
   const followerIds = new Set(followers.map((u) => String(u.id)));
-  const notFollowingBack = following
-    .filter((u) => !followerIds.has(String(u.id)))
-    .sort((a, b) => a.username.localeCompare(b.username));
+  // Mantém a ordem da lista de "seguindo" (data em que você seguiu); o
+  // painel decide como exibir.
+  const notFollowingBack = following.filter((u) => !followerIds.has(String(u.id)));
 
   const result = {
     me: me.username,
